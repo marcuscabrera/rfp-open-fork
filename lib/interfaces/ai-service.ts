@@ -21,6 +21,16 @@ export interface IAIQuestionExtractor {
 }
 
 /**
+ * Interface for AI-powered response generation services
+ */
+export interface IAIResponseGenerator {
+  /**
+   * Generate a response to a question based on a given context
+   */
+  generateResponse(question: string, context: string): Promise<string>;
+}
+
+/**
  * Configuration for AI services
  */
 export interface AIServiceConfig {
@@ -43,4 +53,4 @@ export interface IQuestionExtractionService {
    * Save extracted questions to storage
    */
   saveQuestions(projectId: string, sections: any[]): Promise<void>;
-} 
+}

@@ -6,6 +6,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["fullTextIndex"]
 }
 
 datasource db {
@@ -34,12 +35,6 @@ model Organization {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  // LlamaCloud Project integration (project-specific connection)
-  llamaCloudProjectId    String?
-  llamaCloudProjectName  String?
-  llamaCloudOrgName      String?
-  llamaCloudConnectedAt  DateTime?
 
   // Relationships
   projects          Project[]
@@ -83,30 +78,9 @@ model Project {
 
   // Relationships
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  projectIndexes ProjectIndex[]
 
   @@index([organizationId])
   @@map("projects")
-}
-
-model ProjectIndex {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // LlamaCloud index information (mapped from pipeline API)
-  indexId   String // LlamaCloud pipeline ID (stored as indexId for clarity)
-  indexName String // LlamaCloud pipeline name (stored as indexName for clarity)
-
-  // Foreign key
-  projectId String
-
-  // Relationships
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@unique([projectId, indexId])
-  @@index([projectId])
-  @@map("project_indexes")
 }
 
 model Question {

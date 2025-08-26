@@ -1,26 +1,17 @@
-import {
-  GoogleGenerativeAI,
-  HarmCategory,
-  HarmBlockThreshold,
-} from "@google/generative-ai";
 import { IAIQuestionExtractor, AIServiceConfig } from '@/lib/interfaces/ai-service';
 import { ExtractedQuestions, ExtractedQuestionsSchema } from '@/lib/validators/extract-questions';
-import { DEFAULT_LANGUAGE_MODEL } from '@/lib/constants';
 import { AIServiceError } from '@/lib/errors/api-errors';
+import { localLLMClient, LocalLLMClient } from './local-llm-client';
 
 export class GeminiQuestionExtractor implements IAIQuestionExtractor {
-  private genAI: GoogleGenerativeAI;
+  private llmClient: LocalLLMClient;
   private config: AIServiceConfig;
 
   constructor(config: Partial<AIServiceConfig> = {}) {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new AIServiceError('Gemini API key is not configured');
-    }
-
-    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    this.llmClient = localLLMClient;
 
     this.config = {
-      model: "gemma-3n",
+      model: "gemma:3n", // Changed to match ollama model name
       temperature: 0.1,
       maxTokens: 4000,
       timeout: 60000,
@@ -30,15 +21,11 @@ export class GeminiQuestionExtractor implements IAIQuestionExtractor {
 
   async generateSummary(content: string, documentName: string): Promise<string> {
     try {
-      const model = this.genAI.getGenerativeModel({ model: this.config.model });
       const prompt = this.getSummarySystemPrompt() + "\n\n" + this.formatUserPrompt(content, documentName);
-
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const text = await this.llmClient.generate(this.config.model, prompt);
 
       if (!text) {
-        throw new AIServiceError('Empty response from Gemini for summary generation');
+        throw new AIServiceError('Empty response from local LLM for summary generation');
       }
 
       return text.trim();
@@ -52,19 +39,13 @@ export class GeminiQuestionExtractor implements IAIQuestionExtractor {
 
   async extractEligibility(content: string, documentName: string): Promise<string[]> {
     try {
-      const model = this.genAI.getGenerativeModel({ model: this.config.model });
       const prompt = this.getEligibilitySystemPrompt() + "\n\n" + this.formatUserPrompt(content, documentName);
-
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const text = await this.llmClient.generate(this.config.model, prompt);
 
       if (!text) {
-        throw new AIServiceError('Empty response from Gemini for eligibility extraction');
+        throw new AIServiceError('Empty response from local LLM for eligibility extraction');
       }
 
-      // Gemini doesn't have a guaranteed JSON output mode like OpenAI, so we need to be more careful.
-      // The prompt asks for JSON, but we need to handle cases where it might not be perfect.
       const jsonString = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
       const rawData = JSON.parse(jsonString);
 
@@ -86,15 +67,11 @@ export class GeminiQuestionExtractor implements IAIQuestionExtractor {
 
   async extractQuestions(content: string, documentName: string): Promise<ExtractedQuestions> {
     try {
-      const model = this.genAI.getGenerativeModel({ model: this.config.model });
       const prompt = this.getSystemPrompt() + "\n\n" + this.formatUserPrompt(content, documentName);
-
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const text = await this.llmClient.generate(this.config.model, prompt);
 
       if (!text) {
-        throw new AIServiceError('Empty response from Gemini');
+        throw new AIServiceError('Empty response from local LLM');
       }
 
       const jsonString = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
