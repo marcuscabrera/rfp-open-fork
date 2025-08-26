@@ -1,12 +1,14 @@
 // Environment variables configuration
 export const env = {
   LLAMACLOUD_API_KEY: process.env.LLAMACLOUD_API_KEY || '',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
 };
 
 // Function to validate required environment variables
 export function validateEnv() {
   const requiredVars = [
-    { key: 'LLAMACLOUD_API_KEY', value: env.LLAMACLOUD_API_KEY }
+    { key: 'LLAMACLOUD_API_KEY', value: env.LLAMACLOUD_API_KEY },
+    { key: 'GEMINI_API_KEY', value: env.GEMINI_API_KEY },
   ];
 
   const missingVars = requiredVars.filter(v => !v.value);
