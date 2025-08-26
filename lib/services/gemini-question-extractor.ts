@@ -1,57 +1,47 @@
-import OpenAI from 'openai';
+import {
+  GoogleGenerativeAI,
+  HarmCategory,
+  HarmBlockThreshold,
+} from "@google/generative-ai";
 import { IAIQuestionExtractor, AIServiceConfig } from '@/lib/interfaces/ai-service';
 import { ExtractedQuestions, ExtractedQuestionsSchema } from '@/lib/validators/extract-questions';
 import { DEFAULT_LANGUAGE_MODEL } from '@/lib/constants';
 import { AIServiceError } from '@/lib/errors/api-errors';
 
-/**
- * OpenAI-powered question extraction service
- */
-export class OpenAIQuestionExtractor implements IAIQuestionExtractor {
-  private client: OpenAI;
+export class GeminiQuestionExtractor implements IAIQuestionExtractor {
+  private genAI: GoogleGenerativeAI;
   private config: AIServiceConfig;
 
   constructor(config: Partial<AIServiceConfig> = {}) {
-    this.client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    if (!process.env.GEMINI_API_KEY) {
+      throw new AIServiceError('Gemini API key is not configured');
+    }
+
+    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
     this.config = {
-      model: DEFAULT_LANGUAGE_MODEL,
+      model: "gemma-3n",
       temperature: 0.1,
       maxTokens: 4000,
       timeout: 60000,
       ...config,
     };
-
-    if (!process.env.OPENAI_API_KEY) {
-      throw new AIServiceError('OpenAI API key is not configured');
-    }
   }
 
-  /**
-   * Generate a summary of the RFP document
-   */
   async generateSummary(content: string, documentName: string): Promise<string> {
     try {
-      const systemPrompt = this.getSummarySystemPrompt();
-      
-      const response = await this.client.chat.completions.create({
-        model: this.config.model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: this.formatUserPrompt(content, documentName) }
-        ],
-        temperature: 0.3, // Slightly higher for more creative summaries
-        max_tokens: 500, // Limit summary length
-      });
+      const model = this.genAI.getGenerativeModel({ model: this.config.model });
+      const prompt = this.getSummarySystemPrompt() + "\n\n" + this.formatUserPrompt(content, documentName);
 
-      const assistantMessage = response.choices[0]?.message?.content;
-      if (!assistantMessage) {
-        throw new AIServiceError('Empty response from OpenAI for summary generation');
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      if (!text) {
+        throw new AIServiceError('Empty response from Gemini for summary generation');
       }
 
-      return assistantMessage.trim();
+      return text.trim();
     } catch (error) {
       if (error instanceof AIServiceError) {
         throw error;
@@ -60,33 +50,24 @@ export class OpenAIQuestionExtractor implements IAIQuestionExtractor {
     }
   }
 
-  /**
-   * Extract vendor eligibility requirements from RFP document
-   */
   async extractEligibility(content: string, documentName: string): Promise<string[]> {
     try {
-      const systemPrompt = this.getEligibilitySystemPrompt();
-      
-      const response = await this.client.chat.completions.create({
-        model: this.config.model,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: this.formatUserPrompt(content, documentName) }
-        ],
-        temperature: 0.1, // Low temperature for precise extraction
-        max_tokens: 1000, // Allow for comprehensive eligibility lists
-      });
+      const model = this.genAI.getGenerativeModel({ model: this.config.model });
+      const prompt = this.getEligibilitySystemPrompt() + "\n\n" + this.formatUserPrompt(content, documentName);
 
-      const assistantMessage = response.choices[0]?.message?.content;
-      if (!assistantMessage) {
-        throw new AIServiceError('Empty response from OpenAI for eligibility extraction');
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      if (!text) {
+        throw new AIServiceError('Empty response from Gemini for eligibility extraction');
       }
 
-      // Parse and validate the JSON response
-      const rawData = JSON.parse(assistantMessage);
-      
-      // Expect format: { "eligibility": ["requirement 1", "requirement 2", ...] }
+      // Gemini doesn't have a guaranteed JSON output mode like OpenAI, so we need to be more careful.
+      // The prompt asks for JSON, but we need to handle cases where it might not be perfect.
+      const jsonString = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+      const rawData = JSON.parse(jsonString);
+
       if (!rawData.eligibility || !Array.isArray(rawData.eligibility)) {
         throw new AIServiceError('Invalid eligibility format from AI service');
       }
@@ -103,34 +84,21 @@ export class OpenAIQuestionExtractor implements IAIQuestionExtractor {
     }
   }
 
-  /**
-   * Extract structured questions from document content
-   */
   async extractQuestions(content: string, documentName: string): Promise<ExtractedQuestions> {
     try {
-      const systemPrompt = this.getSystemPrompt();
+      const model = this.genAI.getGenerativeModel({ model: this.config.model });
+      const prompt = this.getSystemPrompt() + "\n\n" + this.formatUserPrompt(content, documentName);
 
-      console.log("content of the document", content); 
-      console.log("documentName", documentName);
-      
-      const response = await this.client.chat.completions.create({
-        model: this.config.model,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: this.formatUserPrompt(content, documentName) }
-        ],
-        temperature: this.config.temperature,
-        max_tokens: this.config.maxTokens,
-      });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
 
-      const assistantMessage = response.choices[0]?.message?.content;
-      if (!assistantMessage) {
-        throw new AIServiceError('Empty response from OpenAI');
+      if (!text) {
+        throw new AIServiceError('Empty response from Gemini');
       }
 
-      // Parse and validate the JSON response
-      const rawData = JSON.parse(assistantMessage);
+      const jsonString = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+      const rawData = JSON.parse(jsonString);
       const extractedData = ExtractedQuestionsSchema.parse(rawData);
 
       return extractedData;
@@ -145,9 +113,6 @@ export class OpenAIQuestionExtractor implements IAIQuestionExtractor {
     }
   }
 
-  /**
-   * Get the system prompt for RFP summary generation
-   */
   private getSummarySystemPrompt(): string {
     return `
 You are an expert at analyzing RFP (Request for Proposal) documents and creating concise, informative summaries.
@@ -165,9 +130,6 @@ Do not include section numbers, question lists, or administrative details like s
     `.trim();
   }
 
-  /**
-   * Get the system prompt for vendor eligibility extraction
-   */
   private getEligibilitySystemPrompt(): string {
     return `
 You are an expert at analyzing RFP (Request for Proposal) documents and extracting vendor eligibility requirements.
@@ -201,9 +163,6 @@ Focus only on mandatory requirements, not preferences. If no clear eligibility c
     `.trim();
   }
 
-  /**
-   * Get the system prompt for question extraction
-   */
   private getSystemPrompt(): string {
     const timestamp = Date.now();
     return `
@@ -243,13 +202,9 @@ Requirements:
     `.trim();
   }
 
-  /**
-   * Format the user prompt with context
-   */
   private formatUserPrompt(content: string, documentName: string): string {
     return `Document Name: ${documentName}\n\nDocument Content:\n${content}`;
   }
 }
 
-// Export singleton instance
-export const openAIQuestionExtractor = new OpenAIQuestionExtractor(); 
+export const geminiQuestionExtractor = new GeminiQuestionExtractor();
