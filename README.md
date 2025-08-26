@@ -32,7 +32,7 @@ AutoRFP is an intelligent platform that automates RFP (Request for Proposal) res
 
 - **Frontend**: Next.js 15, React 19, TypeScript
 - **Styling**: Tailwind CSS, Radix UI Components
-- **Authentication**: Supabase Auth (Magic Link)
+- **Authentication**: Next-Auth with Azure AD Provider
 - **Database**: PostgreSQL with Prisma ORM
 - **AI & ML**: Google Gemini Pro, LlamaIndex, LlamaCloud
 - **Deployment**: Vercel (recommended)
@@ -45,7 +45,7 @@ Before setting up AutoRFP, ensure you have:
 - **Node.js** 18.x or later
 - **pnpm** 8.x or later
 - **PostgreSQL** database (local or cloud)
-- **Supabase** account and project
+- **Azure Active Directory** application registration
 - **Google AI** API key with access to Gemini
 - **LlamaCloud** account (optional but recommended)
 
@@ -73,9 +73,13 @@ Create a `.env.local` file in the root directory:
 DATABASE_URL="postgresql://username:password@localhost:5432/auto_rfp"
 DIRECT_URL="postgresql://username:password@localhost:5432/auto_rfp"
 
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL="your-supabase-project-url"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
+# Azure AD Configuration
+AZURE_AD_CLIENT_ID="your-azure-ad-client-id"
+AZURE_AD_CLIENT_SECRET="your-azure-ad-client-secret"
+AZURE_AD_TENANT_ID="your-azure-ad-tenant-id"
+
+# Next-Auth
+AUTH_SECRET="a-random-secret-for-next-auth"
 
 # Google AI API
 GEMINI_API_KEY="your-gemini-api-key"
@@ -113,14 +117,12 @@ pnpm prisma migrate deploy
 pnpm prisma db seed
 ```
 
-### 5. Supabase Setup
+### 5. Azure AD Setup
 
-1. Create a new Supabase project at [supabase.com](https://supabase.com)
-2. Go to **Settings > API** and copy:
-   - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
-   - Anon public key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-3. Configure authentication providers in **Authentication > Providers**
-4. Set up email templates in **Authentication > Email Templates**
+1.  Register a new application in the Azure portal.
+2.  Configure the application's redirect URI to `http://localhost:3000/api/auth/callback/azure-ad`.
+3.  Create a new client secret and copy its value.
+4.  Copy the Application (client) ID, Directory (tenant) ID, and the client secret to the corresponding environment variables in your `.env.local` file.
 
 ### 6. Google AI (Gemini) Setup
 
@@ -149,12 +151,12 @@ Visit [http://localhost:3000](http://localhost:3000) to see the application.
 auto_rfp/
 ├── app/                          # Next.js 15 App Router
 │   ├── api/                      # API routes
+│   │   ├── auth/                 # Next-Auth route handlers
 │   │   ├── extract-questions/    # Question extraction endpoint
 │   │   ├── generate-response/    # Response generation endpoint
 │   │   ├── llamacloud/          # LlamaCloud integration APIs
 │   │   ├── organizations/       # Organization management APIs
 │   │   └── projects/            # Project management APIs
-│   ├── auth/                    # Authentication pages
 │   ├── login/                   # Login flow
 │   ├── organizations/           # Organization management pages
 │   ├── projects/                # Project management pages
@@ -191,10 +193,9 @@ The application uses a multi-tenant architecture with the following key models:
 
 ### Authentication Flow
 
-1. **Magic Link Authentication**: Users sign in via email magic links
-2. **Organization Creation**: New users can create organizations
-3. **Team Invitations**: Organization owners can invite team members
-4. **Role-based Access**: Support for owner, admin, and member roles
+1.  **Azure AD Authentication**: Users sign in via their corporate Azure AD accounts.
+2.  **Organization Provisioning**: A new organization is automatically created for the user's Azure AD tenant if it doesn't exist.
+3.  **Role-based Access**: Support for owner, admin, and member roles (role mapping from Azure AD groups can be configured).
 
 ### AI Processing Pipeline
 
@@ -212,8 +213,10 @@ The application uses a multi-tenant architecture with the following key models:
 # Set these in your deployment platform
 DATABASE_URL="your-production-database-url"
 DIRECT_URL="your-production-database-direct-url"
-NEXT_PUBLIC_SUPABASE_URL="your-supabase-url"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
+AZURE_AD_CLIENT_ID="your-azure-ad-client-id"
+AZURE_AD_CLIENT_SECRET="your-azure-ad-client-secret"
+AZURE_AD_TENANT_ID="your-azure-ad-tenant-id"
+AUTH_SECRET="a-random-secret-for-next-auth"
 OPENAI_API_KEY="your-openai-api-key"
 LLAMACLOUD_API_KEY="your-llamacloud-api-key"
 NEXT_PUBLIC_APP_URL="https://your-domain.com"
@@ -273,9 +276,8 @@ pnpm prisma migrate reset
 ```
 
 **Authentication Issues**
-- Verify Supabase URL and keys
-- Check email template configuration
-- Ensure redirect URLs are configured correctly
+- Verify Azure AD credentials and redirect URI.
+- Ensure the `AUTH_SECRET` environment variable is set.
 
 **AI Processing Issues**
 - Verify OpenAI API key and credits
@@ -285,7 +287,7 @@ pnpm prisma migrate reset
 **Environment Variables**
 ```bash
 # Check if all required variables are set
-node -e "console.log(process.env)" | grep -E "(DATABASE_URL|SUPABASE|OPENAI|LLAMACLOUD)"
+node -e "console.log(process.env)" | grep -E "(DATABASE_URL|AZURE_AD|AUTH_SECRET|OPENAI|LLAMACLOUD)"
 ```
 
 ## 🤝 Contributing
@@ -331,7 +333,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **LlamaIndex** for powerful document indexing and retrieval
 - **Google** for advanced language model capabilities
-- **Supabase** for authentication and database infrastructure
+- **Next-Auth** for simplified authentication
 - **Vercel** for Next.js framework and deployment platform
 - **Radix UI** for accessible component primitives
 
