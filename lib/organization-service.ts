@@ -1,5 +1,5 @@
 import { db } from './db';
-import { createClient } from '@/lib/utils/supabase/server';
+import { createClient } from '@/utils/supabase/server';
 
 // Simple in-memory cache for current user (lasts for the duration of request)
 let currentUserCache: { user: any; timestamp: number } | null = null;
