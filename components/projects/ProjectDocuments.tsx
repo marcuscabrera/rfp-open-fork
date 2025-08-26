@@ -110,6 +110,21 @@ const getPillText = (fileType: string): string => {
 
 const INITIAL_DOCUMENTS_SHOWN = 12;
 
+export const formatFileSize = (bytes?: number) => {
+  if (bytes === undefined) return 'Unknown size';
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let size = bytes;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+
+  return `${Math.round(size * 100) / 100} ${units[unitIndex]}`;
+};
+
 export function ProjectDocuments({ projectId }: ProjectDocumentsProps) {
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const [projectIndexes, setProjectIndexes] = useState<ProjectIndex[]>([]);
@@ -260,20 +275,6 @@ export function ProjectDocuments({ projectId }: ProjectDocumentsProps) {
     }));
   };
 
-  const formatFileSize = (bytes?: number) => {
-    if (!bytes) return 'Unknown size';
-    
-    const units = ['B', 'KB', 'MB', 'GB'];
-    let size = bytes;
-    let unitIndex = 0;
-    
-    while (size >= 1024 && unitIndex < units.length - 1) {
-      size /= 1024;
-      unitIndex++;
-    }
-    
-    return `${Math.round(size * 100) / 100} ${units[unitIndex]}`;
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
