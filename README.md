@@ -259,7 +259,7 @@ The application can be deployed to any platform that supports Node.js:
 ## 🧪 Sample Data
 
 Try the platform with our sample RFP document:
-- **Sample File**: [RFP - Launch Services for Medium-Lift Payloads](https://qluspotebpidccpfbdho.supabase.co/storage/v1/object/public/sample-files//RFP%20-%20Launch%20Services%20for%20Medium-Lift%20Payloads.pdf)
+- **Sample File**: [RFP - Launch Services for Medium-Lift Payloads](https://qluspotebpidccpfbdho.supabase.co/storage/v1/object/public/sample-files/RFP%20-%20Launch%20Services%20for%20Medium-Lift%20Payloads.pdf)
 - **Use Case**: Download and upload to test question extraction and response generation
 
 ## 🐛 Troubleshooting
