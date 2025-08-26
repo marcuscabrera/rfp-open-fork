@@ -100,7 +100,14 @@ export function FileUploader({
   const handleFile = (file: File) => {
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
     
-    if (fileExtension === 'csv' || fileExtension === 'xlsx' || fileExtension === 'xls' || fileExtension === 'pdf') {
+    if (
+      fileExtension === 'csv' ||
+      fileExtension === 'xlsx' ||
+      fileExtension === 'xls' ||
+      fileExtension === 'pdf' ||
+      fileExtension === 'doc' ||
+      fileExtension === 'docx'
+    ) {
       setFile(file);
       if (!documentName) {
         setDocumentName(file.name.split('.')[0]);
@@ -108,7 +115,7 @@ export function FileUploader({
     } else {
       toast({
         title: "Unsupported file format",
-        description: "Please upload an Excel (.xlsx, .xls), CSV (.csv), or PDF file.",
+        description: "Please upload an Excel (.xlsx, .xls), CSV (.csv), PDF (.pdf), or Word (.doc, .docx) file.",
         variant: "destructive"
       });
     }
@@ -278,12 +285,12 @@ export function FileUploader({
                 </svg>
                 <div>
                   <p className="font-medium">Drag and drop your file here or click to browse</p>
-                  <p className="text-sm text-muted-foreground">Supports Excel (.xlsx, .xls), CSV (.csv), and PDF files</p>
+                  <p className="text-sm text-muted-foreground">Supports Excel (.xlsx, .xls), CSV (.csv), PDF (.pdf), and Word (.doc, .docx) files</p>
                 </div>
-                <Input 
-                  type="file" 
-                  accept=".xlsx,.xls,.csv,.pdf" 
-                  className="hidden" 
+                <Input
+                  type="file"
+                  accept=".xlsx,.xls,.csv,.pdf,.doc,.docx"
+                  className="hidden"
                   ref={inputRef}
                   onChange={handleChange}
                 />
