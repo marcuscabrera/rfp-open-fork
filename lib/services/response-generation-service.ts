@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { organizationService } from '@/lib/organization-service';
-import { LlamaIndexService } from '@/lib/llama-index-service';
+import { documentSearchService } from './document-search-service';
+import { localLLMClient } from './local-llm-client';
 import { 
   GenerateResponseRequest, 
   GenerateResponseResponse,
@@ -10,41 +11,40 @@ import {
   AuthorizationError,
   ForbiddenError,
   NotFoundError,
-  LlamaCloudConnectionError
 } from '@/lib/errors/api-errors';
-
-interface ProjectWithOrganization {
-  id: string;
-  organization: {
-    id: string;
-    llamaCloudProjectId: string | null;
-    llamaCloudProjectName: string | null;
-    llamaCloudConnectedAt: Date | null;
-  };
-  projectIndexes: Array<{
-    indexId: string;
-    indexName: string;
-  }>;
-}
 
 export class ResponseGenerationService {
   async generateResponse(request: GenerateResponseRequest): Promise<GenerateResponseResponse> {
     const currentUser = await this.getCurrentUser();
-    const project = await this.getProjectWithAuthorization(request.projectId, currentUser.id);
+    await this.authorizeProjectAccess(request.projectId, currentUser.id);
     
-    this.validateLlamaCloudConnection(project);
-    
-    if (this.shouldUseDefaultResponse(request, project)) {
-      return this.generateDefaultResponse(request.question);
-    }
+    const sources = await documentSearchService.search(request.question, request.projectId);
+    const context = sources.map(s => s.textContent).join('\n\n');
 
-    const selectedIndexNames = this.getSelectedIndexNames(request, project);
-    
-    if (selectedIndexNames.length === 0 && !request.useAllIndexes) {
-      return this.generateDefaultResponse(request.question, 'No valid indexes found');
-    }
+    const responseText = await localLLMClient.generate(
+      'gemma:3n',
+      `Question: ${request.question}\n\nContext: ${context}\n\nAnswer:`
+    );
 
-    return this.generateLlamaIndexResponse(request, project, selectedIndexNames);
+    const metadata: GenerateResponseMetadata = {
+      confidence: 0.9, // Mock confidence
+      generatedAt: new Date().toISOString(),
+      indexesUsed: [],
+    };
+
+    return {
+      success: true,
+      response: responseText,
+      sources: sources.map(s => ({
+        id: s.id,
+        documentId: s.documentId || '',
+        fileName: s.fileName,
+        filePath: s.filePath || '',
+        pageNumber: s.pageNumber || '',
+        relevance: 0.9, // Mock relevance
+      })),
+      metadata,
+    };
   }
 
   private async getCurrentUser() {
@@ -55,20 +55,10 @@ export class ResponseGenerationService {
     return currentUser;
   }
 
-  private async getProjectWithAuthorization(projectId: string, userId: string): Promise<ProjectWithOrganization> {
+  private async authorizeProjectAccess(projectId: string, userId: string): Promise<void> {
     const project = await db.project.findUnique({
       where: { id: projectId },
-      include: {
-        organization: {
-          select: {
-            id: true,
-            llamaCloudProjectId: true,
-            llamaCloudProjectName: true,
-            llamaCloudConnectedAt: true,
-          },
-        },
-        projectIndexes: true,
-      },
+      select: { organizationId: true },
     });
 
     if (!project) {
@@ -77,90 +67,11 @@ export class ResponseGenerationService {
 
     const isMember = await organizationService.isUserOrganizationMember(
       userId,
-      project.organization.id
+      project.organizationId
     );
     
     if (!isMember) {
       throw new ForbiddenError('You do not have access to this project');
     }
-
-    return project;
   }
-
-  private validateLlamaCloudConnection(project: ProjectWithOrganization): void {
-    if (!project.organization.llamaCloudProjectId || !project.organization.llamaCloudConnectedAt) {
-      throw new LlamaCloudConnectionError('Organization is not connected to LlamaCloud');
-    }
-  }
-
-  private shouldUseDefaultResponse(request: GenerateResponseRequest, project: ProjectWithOrganization): boolean {
-    return !request.useAllIndexes && (!request.selectedIndexIds || request.selectedIndexIds.length === 0);
-  }
-
-  private getSelectedIndexNames(request: GenerateResponseRequest, project: ProjectWithOrganization): string[] {
-    console.log('DEBUG: getSelectedIndexNames called');
-    console.log('DEBUG: request.selectedIndexIds:', request.selectedIndexIds);
-    console.log('DEBUG: project.projectIndexes:', project.projectIndexes);
-    
-    const selectedIndexNames = project.projectIndexes
-      .filter(projectIndex => {
-        const isSelected = request.selectedIndexIds!.includes(projectIndex.indexId);
-        console.log(`DEBUG: Checking ${projectIndex.indexName} (${projectIndex.indexId}): ${isSelected}`);
-        return isSelected;
-      })
-      .map(projectIndex => projectIndex.indexName);
-    
-    console.log('DEBUG: Final selectedIndexNames:', selectedIndexNames);
-    return selectedIndexNames;
-  }
-
-  private async generateDefaultResponse(question: string, note?: string): Promise<GenerateResponseResponse> {
-    const llamaIndexService = new LlamaIndexService();
-    const result = await llamaIndexService.generateDefaultResponse(question);
-    
-    const metadata: GenerateResponseMetadata = {
-      confidence: result.confidence,
-      generatedAt: result.generatedAt,
-      indexesUsed: [],
-      note: note || 'Generated using default responses due to no selected indexes'
-    };
-
-    return {
-      success: true,
-      response: result.response,
-      sources: result.sources,
-      metadata,
-    };
-  }
-
-  private async generateLlamaIndexResponse(
-    request: GenerateResponseRequest, 
-    project: ProjectWithOrganization, 
-    selectedIndexNames: string[]
-  ): Promise<GenerateResponseResponse> {
-    const llamaIndexService = new LlamaIndexService({
-      apiKey: process.env.LLAMACLOUD_API_KEY!,
-      projectName: project.organization.llamaCloudProjectName || 'Default',
-      indexNames: request.useAllIndexes ? undefined : selectedIndexNames,
-    });
-
-    const result = await llamaIndexService.generateResponse(request.question, {
-      documentIds: request.documentIds,
-      selectedIndexIds: request.useAllIndexes ? undefined : request.selectedIndexIds,
-      useAllIndexes: request.useAllIndexes
-    });
-
-    const metadata: GenerateResponseMetadata = {
-      confidence: result.confidence,
-      generatedAt: result.generatedAt,
-      indexesUsed: selectedIndexNames,
-    };
-
-    return {
-      success: true,
-      response: result.response,
-      sources: result.sources,
-      metadata,
-    };
-  }
-} 
+}
