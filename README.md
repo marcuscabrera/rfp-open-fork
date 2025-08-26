@@ -34,7 +34,7 @@ AutoRFP is an intelligent platform that automates RFP (Request for Proposal) res
 - **Styling**: Tailwind CSS, Radix UI Components
 - **Authentication**: Supabase Auth (Magic Link)
 - **Database**: PostgreSQL with Prisma ORM
-- **AI & ML**: OpenAI GPT-4o, LlamaIndex, LlamaCloud
+- **AI & ML**: Google Gemini Pro, LlamaIndex, LlamaCloud
 - **Deployment**: Vercel (recommended)
 - **Package Manager**: pnpm
 
@@ -46,7 +46,7 @@ Before setting up AutoRFP, ensure you have:
 - **pnpm** 8.x or later
 - **PostgreSQL** database (local or cloud)
 - **Supabase** account and project
-- **OpenAI** API account with credits
+- **Google AI** API key with access to Gemini
 - **LlamaCloud** account (optional but recommended)
 
 ## 🚀 Getting Started
@@ -77,8 +77,8 @@ DIRECT_URL="postgresql://username:password@localhost:5432/auto_rfp"
 NEXT_PUBLIC_SUPABASE_URL="your-supabase-project-url"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
 
-# OpenAI API
-OPENAI_API_KEY="your-openai-api-key"
+# Google AI API
+GEMINI_API_KEY="your-gemini-api-key"
 
 # LlamaCloud
 LLAMACLOUD_API_KEY="your-llamacloud-api-key"
@@ -122,12 +122,11 @@ pnpm prisma db seed
 3. Configure authentication providers in **Authentication > Providers**
 4. Set up email templates in **Authentication > Email Templates**
 
-### 6. OpenAI Setup
+### 6. Google AI (Gemini) Setup
 
-1. Create an account at [platform.openai.com](https://platform.openai.com)
-2. Generate an API key in **API Keys** section
-3. Add credits to your account
-4. Copy the API key to `OPENAI_API_KEY`
+1. Go to [Google AI Studio](https://aistudio.google.com/) and create an API key.
+2. Make sure the Gemini API is enabled for your project.
+3. Copy the API key to `GEMINI_API_KEY` in your `.env.local` file.
 
 ### 7. LlamaCloud Setup (Optional)
 
@@ -200,7 +199,7 @@ The application uses a multi-tenant architecture with the following key models:
 ### AI Processing Pipeline
 
 1. **Document Upload**: Users upload RFP documents
-2. **Question Extraction**: OpenAI extracts structured questions
+2. **Question Extraction**: Gemini extracts structured questions
 3. **Document Indexing**: LlamaCloud indexes documents for search
 4. **Response Generation**: Multi-step AI process generates responses
 5. **Source Attribution**: Responses include relevant source citations
@@ -331,7 +330,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - **LlamaIndex** for powerful document indexing and retrieval
-- **OpenAI** for advanced language model capabilities
+- **Google** for advanced language model capabilities
 - **Supabase** for authentication and database infrastructure
 - **Vercel** for Next.js framework and deployment platform
 - **Radix UI** for accessible component primitives
