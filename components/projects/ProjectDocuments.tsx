@@ -111,7 +111,7 @@ const getPillText = (fileType: string): string => {
 const INITIAL_DOCUMENTS_SHOWN = 12;
 
 export const formatFileSize = (bytes?: number) => {
-  if (bytes === undefined) return 'Unknown size';
+  if (bytes === undefined || bytes === null) return 'Unknown size';
 
   const units = ['B', 'KB', 'MB', 'GB'];
   let size = bytes;
